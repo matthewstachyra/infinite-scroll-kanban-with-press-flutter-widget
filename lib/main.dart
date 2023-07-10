@@ -33,31 +33,41 @@ class Feed extends StatefulWidget {
 ////////////////////////////////////////////////////////////////////////////////
 
 class _FeedState extends State<Feed> {
-  // test: these need default values
-  int verticalIndex = 0;
-  int horizontalIndex = 0;
+  // these need default values for the initial build / insertion into tree
+  // currently testing by setting to 'late'
+  late int verticalIndex;
+  late int horizontalIndex;
+  late int numChips = 0;
+  late LinkedHashMap<String, List<String>> posts;
 
-  LinkedHashMap<String, List<String>> posts =
-      LinkedHashMap<String, List<String>>.from({
-    'Post 1': [
-      '0, 0',
-      '0, 1',
-      '0, 2',
-      '0, 3',
-    ],
-    'Post 2': [
-      '1, 0',
-      '1, 1',
-      '1, 2',
-      '1, 3',
-    ],
-    'Post 3': [
-      '2, 0',
-      '2, 1',
-      '2, 2',
-      '2, 3',
-    ],
-  });
+  @override
+  void initState() {
+    super.initState();
+    verticalIndex = 0;
+    horizontalIndex = 0;
+    posts = LinkedHashMap<String, List<String>>.from({
+      'Post 1': [
+        '0, 0',
+        '0, 1',
+        '0, 2',
+        '0, 3',
+      ],
+      'Post 2': [
+        '1, 0',
+        '1, 1',
+        '1, 2',
+        '1, 3',
+      ],
+      'Post 3': [
+        '2, 0',
+        '2, 1',
+        '2, 2',
+        '2, 3',
+      ],
+    });
+    numChips =
+        posts[posts.keys.toList()[verticalIndex]]![horizontalIndex].length;
+  }
 
   void _updateFeedState(vindex, hindex) {
     setState(() {
@@ -76,6 +86,7 @@ class _FeedState extends State<Feed> {
           Kanban(
               horizontalIndex: horizontalIndex,
               verticalIndex: verticalIndex,
+              numChips: numChips,
               updateFeedState: _updateFeedState),
           Expanded(
             child: Post(
@@ -96,13 +107,15 @@ class _FeedState extends State<Feed> {
 class Kanban extends StatefulWidget {
   final int verticalIndex;
   final int horizontalIndex;
+  final int numChips;
   final void Function(dynamic, dynamic) updateFeedState;
 
   const Kanban(
       {Key? key,
       required this.verticalIndex,
       required this.horizontalIndex,
-      required this.updateFeedState})
+      required this.updateFeedState,
+      required this.numChips})
       : super(key: key);
 
   @override
@@ -116,12 +129,14 @@ class Kanban extends StatefulWidget {
 class KanbanState extends State<Kanban> {
   late int horizontalIndex;
   late int verticalIndex;
+  late int numChips;
 
   @override
   void initState() {
     super.initState();
     horizontalIndex = widget.horizontalIndex;
     verticalIndex = widget.verticalIndex;
+    numChips = widget.numChips;
   }
 
   @override
@@ -140,17 +155,14 @@ class KanbanState extends State<Kanban> {
     }
   }
 
-  List<Widget> _generateActionChips(String text, int num) {
+  List<Widget> _generateActionChips(String text, int numChips) {
     return List.generate(
-      num, // Number of action chips to generate
+      numChips,
       (index) => ActionChip(
         label: Text(text),
         onPressed: () {
-          // calculate the horizontal index based on the number action chip
-          // TODO
-
           setState(() {
-            widget.updateFeedState(verticalIndex, horizontalIndex);
+            widget.updateFeedState(verticalIndex, index);
           });
         },
       ),
@@ -166,8 +178,8 @@ class KanbanState extends State<Kanban> {
         scrollDirection: Axis.horizontal,
         children: <Widget>[
           Row(
-              children:
-                  _generateActionChips(widget.verticalIndex.toString(), 15))
+              children: _generateActionChips(
+                  widget.verticalIndex.toString(), numChips))
         ],
       ),
     );
