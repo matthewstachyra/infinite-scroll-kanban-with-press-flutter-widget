@@ -159,7 +159,7 @@ class KanbanState extends State<Kanban> {
         horizontalIndex = widget.horizontalIndex;
         numChips = widget.numChips;
         actionChips = _generateActionChips(widget.numChips);
-        _scrollController.jumpTo(20.0);
+        _scrollController.jumpTo(5.0);
       });
     }
   }
