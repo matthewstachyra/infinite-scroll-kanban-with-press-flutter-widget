@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:infinite_listview/infinite_listview.dart';
 import 'dart:collection';
 
 void main() async {
@@ -40,33 +41,18 @@ class _FeedState extends State<Feed> {
   late int numChips = 0;
   late LinkedHashMap<String, List<String>> posts;
 
-  @override
-  void initState() {
-    super.initState();
-    verticalIndex = 0;
-    horizontalIndex = 0;
-    posts = LinkedHashMap<String, List<String>>.from({
-      'Post 1': [
-        '0, 0',
-        '0, 1',
-        '0, 2',
-        '0, 3',
-      ],
-      'Post 2': [
-        '1, 0',
-        '1, 1',
-        '1, 2',
-        '1, 3',
-      ],
-      'Post 3': [
-        '2, 0',
-        '2, 1',
-        '2, 2',
-        '2, 3',
-      ],
-    });
-    numChips =
-        posts[posts.keys.toList()[verticalIndex]]![horizontalIndex].length;
+  LinkedHashMap<String, List<String>> createPosts(int numKeys, int numValues) {
+    LinkedHashMap<String, List<String>> map = LinkedHashMap();
+
+    for (int i = 0; i < numKeys; i++) {
+      List<String> values = [];
+      for (int j = 0; j < numValues; j++) {
+        values.add('$i,$j');
+      }
+      map[i.toString()] = values;
+    }
+
+    return map;
   }
 
   void _updateFeedState(vindex, hindex) {
@@ -74,6 +60,22 @@ class _FeedState extends State<Feed> {
       verticalIndex = vindex;
       horizontalIndex = hindex;
     });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    verticalIndex = 0;
+    horizontalIndex = 0;
+
+    // posts that will be displayed in kanban and in feed view
+    posts = createPosts(50, 50);
+
+    // length of the list of values for the vertical index
+    dynamic key = posts.keys.toList()[verticalIndex];
+    if (posts[key] != null) {
+      numChips = posts[key]!.length;
+    }
   }
 
   @override
@@ -92,6 +94,7 @@ class _FeedState extends State<Feed> {
             child: Post(
               horizontalIndex: horizontalIndex,
               verticalIndex: verticalIndex,
+              posts: posts,
               updateFeedState: _updateFeedState,
             ),
           )
@@ -130,6 +133,8 @@ class KanbanState extends State<Kanban> {
   late int horizontalIndex;
   late int verticalIndex;
   late int numChips;
+  late List<Widget> actionChips;
+  final InfiniteScrollController _scrollController = InfiniteScrollController();
 
   @override
   void initState() {
@@ -137,6 +142,7 @@ class KanbanState extends State<Kanban> {
     horizontalIndex = widget.horizontalIndex;
     verticalIndex = widget.verticalIndex;
     numChips = widget.numChips;
+    actionChips = _generateActionChips(widget.numChips);
   }
 
   @override
@@ -151,18 +157,29 @@ class KanbanState extends State<Kanban> {
       setState(() {
         verticalIndex = widget.verticalIndex;
         horizontalIndex = widget.horizontalIndex;
+        numChips = widget.numChips;
+        actionChips = _generateActionChips(widget.numChips);
+        _scrollController.jumpTo(20.0);
       });
     }
   }
 
-  List<Widget> _generateActionChips(String text, int numChips) {
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  List<Widget> _generateActionChips(int numChips) {
     return List.generate(
       numChips,
       (index) => ActionChip(
-        label: Text(text),
+        // calculate the index to display inside the action chip
+        label: Text(((horizontalIndex + index) % numChips).toString()),
         onPressed: () {
           setState(() {
-            widget.updateFeedState(verticalIndex, index);
+            widget.updateFeedState(
+                verticalIndex, (horizontalIndex + index) % numChips);
           });
         },
       ),
@@ -174,14 +191,12 @@ class KanbanState extends State<Kanban> {
     return Container(
       color: Colors.grey,
       height: 100.0,
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        children: <Widget>[
-          Row(
-              children: _generateActionChips(
-                  widget.verticalIndex.toString(), numChips))
-        ],
-      ),
+      child: InfiniteListView.builder(
+          scrollDirection: Axis.horizontal,
+          controller: _scrollController,
+          itemBuilder: (context, index) {
+            return Row(children: actionChips);
+          }),
     );
   }
 }
@@ -199,12 +214,14 @@ enum SwipeDirection {
 class Post extends StatefulWidget {
   final int verticalIndex;
   final int horizontalIndex;
+  final LinkedHashMap<String, List<String>> posts;
   final void Function(dynamic, dynamic) updateFeedState;
 
   const Post(
       {Key? key,
       required this.verticalIndex,
       required this.horizontalIndex,
+      required this.posts,
       required this.updateFeedState})
       : super(key: key);
 
@@ -218,41 +235,21 @@ class _PostState extends State<Post> {
   late int horizontalIndex;
   late int verticalIndex;
   late SwipeDirection type;
-
-  LinkedHashMap<String, List<String>> posts =
-      LinkedHashMap<String, List<String>>.from({
-    'Post 1': [
-      '0, 0',
-      '0, 1',
-      '0, 2',
-      '0, 3',
-    ],
-    'Post 2': [
-      '1, 0',
-      '1, 1',
-      '1, 2',
-      '1, 3',
-    ],
-    'Post 3': [
-      '2, 0',
-      '2, 1',
-      '2, 2',
-      '2, 3',
-    ],
-  });
+  late LinkedHashMap<String, List<String>> posts;
 
   @override
   void initState() {
     super.initState();
     horizontalIndex = widget.horizontalIndex;
     verticalIndex = widget.verticalIndex;
+    posts = widget.posts;
   }
 
   @override
   void didUpdateWidget(Post oldWidget) {
     // This checks whether Kanban's variables have changed value.
     // Those variables get their value from the parent, Feed. And,
-    // Feed changes whenver we call the callback that is defined first
+    // Feed changes whenever we call the callback that is defined first
     // within Feed. That callback calls setState() which triggers a rebuild.
     super.didUpdateWidget(oldWidget);
     if (oldWidget.verticalIndex != widget.verticalIndex ||
@@ -273,7 +270,7 @@ class _PostState extends State<Post> {
           behavior: HitTestBehavior.opaque,
           onVerticalDragEnd: (details) {
             if (details.primaryVelocity! < 0 &&
-                verticalIndex < posts.length - 1 &&
+                verticalIndex < widget.posts.length - 1 &&
                 horizontalIndex == 0) {
               // Swiped downwards
               type = SwipeDirection.down;
@@ -306,7 +303,7 @@ class _PostState extends State<Post> {
                 horizontalIndex = horizontalIndex % numRelatedPosts;
                 widget.updateFeedState(verticalIndex, horizontalIndex);
               });
-            } else if (details.primaryVelocity! > 0 && horizontalIndex > 0) {
+            } else if (details.primaryVelocity! > 0 && horizontalIndex >= 0) {
               // Swiped to the left
               type = SwipeDirection.left;
               setState(() {
